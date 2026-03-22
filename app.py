@@ -79,7 +79,12 @@ textarea {{
 # ---------------- SESSION STATE ----------------
 if "history" not in st.session_state:
     st.session_state.history = []
-
+else:
+    # Remove invalid entries (fix deployment error)
+    st.session_state.history = [
+        item for item in st.session_state.history
+        if isinstance(item, dict) and "input" in item and "output" in item
+    ]
 # ---------------- SIDEBAR ----------------
 st.sidebar.markdown("## 📚 AI Assistant")
 
@@ -133,8 +138,8 @@ with col3:
 # ---------------- GENERATE ----------------
 if generate:
 
-    with st.spinner("🤖 AI is thinking... Please wait..."):
-        
+    with st.spinner("🤖 AI is thinking..."):
+
         if clean_task == "PDF Summarizer" and uploaded_file:
             pdf_text = extract_pdf_text(uploaded_file)
             prompt = f"Summarize this PDF content:\n{pdf_text}"
@@ -143,9 +148,10 @@ if generate:
 
         result = ask_ai(prompt)
 
-    # Save history
+    # ✅ ALWAYS store both input + output
     st.session_state.history.append({
-        "input": user_input
+        "input": user_input,
+        "output": result
     })
 
     # OUTPUT
@@ -159,15 +165,19 @@ if st.session_state.history and download_pdf:
 
     last_entry = st.session_state.history[-1]
 
-    pdf_file = create_pdf(
-        last_entry['input'],
-        last_entry['output']
-    )
+    if "input" in last_entry and "output" in last_entry:
 
-    with open(pdf_file, "rb") as f:
-        st.download_button(
-            label="⬇️ Download PDF Report",
-            data=f,
-            file_name="AI_Report.pdf",
-            mime="application/pdf"
+        pdf_file = create_pdf(
+            last_entry["input"],
+            last_entry["output"]
         )
+
+        with open(pdf_file, "rb") as f:
+            st.download_button(
+                label="⬇️ Download PDF Report",
+                data=f,
+                file_name="AI_Report.pdf",
+                mime="application/pdf"
+            )
+    else:
+        st.warning("⚠️ Please generate output first before downloading PDF.")
